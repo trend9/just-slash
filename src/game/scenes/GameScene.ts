@@ -42,6 +42,11 @@ export default class GameScene extends Phaser.Scene {
   private maxSlashCooldown: number = 400; // 0.4 seconds
   private isSlashActive: boolean = false;
   private slashVisualRing: Phaser.GameObjects.Graphics | null = null;
+  private slashTime: number = 0;
+  private slashDuration: number = 180;
+  private slashedIds: Set<any> = new Set();
+  private slashStartAngle: number = -Math.PI - 0.25; // slightly behind left
+  private slashEndAngle: number = 0.25; // slightly behind right
   
   // Burst mode
   private isBurstMode: boolean = false;
@@ -98,8 +103,8 @@ export default class GameScene extends Phaser.Scene {
     this.bg1 = this.add.tileSprite(0, 0, width, height, "background").setOrigin(0, 0);
     
     // Set physics world bounds - left and right bounce, top and bottom open
-    // setBounds(x, y, width, height, left, right, top, bottom)
-    this.physics.world.setBounds(0, 0, width, height, true, true, false, false);
+    this.physics.world.setBounds(0, 0, width, height);
+    this.physics.world.setBoundsCollision(true, true, false, false);
 
     // Create Groups
     this.enemies = this.physics.add.group();
@@ -205,6 +210,21 @@ export default class GameScene extends Phaser.Scene {
   update(time: number, delta: number) {
     if (this.isGameOver || this.isGameClear) return;
 
+    // Handle sweeping slash active duration and collision checks
+    if (this.isSlashActive && this.player) {
+      this.slashTime += delta;
+      if (this.slashTime >= this.slashDuration) {
+        this.isSlashActive = false;
+        if (this.slashVisualRing) {
+          this.slashVisualRing.destroy();
+          this.slashVisualRing = null;
+        }
+      } else {
+        this.drawSweepingSlash();
+        this.checkSweepingSlashCollisions();
+      }
+    }
+
     // Scroll background
     if (this.bg1) {
       this.bg1.tilePositionY -= this.scrollSpeed;
@@ -271,113 +291,133 @@ export default class GameScene extends Phaser.Scene {
 
     this.slashCooldown = this.maxSlashCooldown;
     this.isSlashActive = true;
-
-    // Normal slash radius is 100 pixels
-    const slashRadius = 100;
-    const playerX = this.player!.x;
-    const playerY = this.player!.y;
-
-    // 1. Visually draw the slash circle
-    this.drawSlashVisual(playerX, playerY, slashRadius);
+    this.slashTime = 0;
+    this.slashedIds.clear();
 
     // Play standard slash sound
     soundSynth.playSlash();
 
-    // 2. Perform distance-based hit check
-    let targetBullets: any[] = [];
-    let targetEnemies: any[] = [];
-
-    // Outer edge check: "最先端エッジ" (Just Slash trigger zone: 90px to 100px)
-    let isJustSlashTriggered = false;
-
-    // Get all bullets in range
-    if (this.enemyBullets) {
-      this.enemyBullets.getChildren().forEach((bulletObj: any) => {
-        const bullet = bulletObj as Phaser.Physics.Arcade.Sprite;
-        const dist = Phaser.Math.Distance.Between(playerX, playerY, bullet.x, bullet.y);
-        
-        if (dist <= slashRadius) {
-          targetBullets.push(bullet);
-          if (dist >= 88 && dist <= 102) {
-            isJustSlashTriggered = true;
-          }
-        }
-      });
-    }
-
-    // Get all enemies in range
-    if (this.enemies) {
-      this.enemies.getChildren().forEach((enemyObj: any) => {
-        const enemy = enemyObj as Phaser.Physics.Arcade.Sprite;
-        const dist = Phaser.Math.Distance.Between(playerX, playerY, enemy.x, enemy.y);
-        
-        if (dist <= slashRadius) {
-          targetEnemies.push(enemy);
-          if (dist >= 85 && dist <= 105) { // Slightly wider window for large enemy assets
-            isJustSlashTriggered = true;
-          }
-        }
-      });
-    }
-
-    // 3. Process Slash Actions
-    if (isJustSlashTriggered) {
-      this.triggerJustSlashBurst();
-    } else {
-      // Normal Slash resolution
-      targetBullets.forEach(b => {
-        this.score += 50;
-        this.createSparks(b.x, b.y, 0x00f0ff);
-        b.destroy();
-      });
-
-      targetEnemies.forEach((e: any) => {
-        this.damageEnemy(e, 25); // normal slash damage
-      });
-
-      this.slashCount += targetBullets.length + targetEnemies.length;
-    }
-
-    // Clear slash active flag after a moment
-    this.time.delayedCall(150, () => {
-      this.isSlashActive = false;
-      if (this.slashVisualRing) {
-        this.slashVisualRing.destroy();
-        this.slashVisualRing = null;
-      }
-    });
-
     this.updateHudData();
   }
 
-  // DRAW circular slash visual
-  private drawSlashVisual(x: number, y: number, r: number) {
+  // Draw the laser sword rotating from left to right with neon trails
+  private drawSweepingSlash() {
+    if (!this.player) return;
     if (this.slashVisualRing) this.slashVisualRing.destroy();
 
     this.slashVisualRing = this.add.graphics();
-    this.slashVisualRing.setDepth(4);
+    this.slashVisualRing.setDepth(6); // Draw on top of characters
 
-    // Cyan glowing outer ring
-    this.slashVisualRing.lineStyle(4, 0x00f0ff, 0.8);
-    this.slashVisualRing.strokeCircle(x, y, r);
+    const x = this.player.x;
+    const y = this.player.y;
+    const r = 100; // Sword radius
 
-    // Semi-transparent center fill
-    this.slashVisualRing.fillStyle(0x00f0ff, 0.1);
-    this.slashVisualRing.fillCircle(x, y, r);
+    const f = Math.min(this.slashTime / this.slashDuration, 1);
+    const currAngle = this.slashStartAngle + f * (this.slashEndAngle - this.slashStartAngle);
 
-    // Add tween to fade out the ring
-    this.tweens.add({
-      targets: this.slashVisualRing,
-      alpha: 0,
-      scale: 1.1,
-      duration: 150,
-      onComplete: () => {
-        if (this.slashVisualRing) {
-          this.slashVisualRing.destroy();
-          this.slashVisualRing = null;
+    // Draw motion blur sweep sector (fading neon cyan)
+    this.slashVisualRing.fillStyle(0x00f0ff, 0.14);
+    this.slashVisualRing.beginPath();
+    this.slashVisualRing.moveTo(x, y);
+    this.slashVisualRing.arc(x, y, r, this.slashStartAngle, currAngle);
+    this.slashVisualRing.closePath();
+    this.slashVisualRing.fill();
+
+    // Draw glowing neon outer arc border
+    this.slashVisualRing.lineStyle(3, 0x00f0ff, 0.45);
+    this.slashVisualRing.beginPath();
+    this.slashVisualRing.arc(x, y, r, this.slashStartAngle, currAngle);
+    this.slashVisualRing.stroke();
+
+    // Draw leading edge glowing laser blade (bright thick cyan line)
+    this.slashVisualRing.lineStyle(5, 0x00f0ff, 1);
+    this.slashVisualRing.lineBetween(
+      x, y,
+      x + r * Math.cos(currAngle),
+      y + r * Math.sin(currAngle)
+    );
+
+    // Draw leading edge white hot core
+    this.slashVisualRing.lineStyle(2, 0xffffff, 1);
+    this.slashVisualRing.lineBetween(
+      x, y,
+      x + r * Math.cos(currAngle),
+      y + r * Math.sin(currAngle)
+    );
+  }
+
+  // Perform collision checks only inside the currently swept angle sector
+  private checkSweepingSlashCollisions() {
+    if (!this.player) return;
+    const playerX = this.player.x;
+    const playerY = this.player.y;
+    const r = 100;
+
+    const f = Math.min(this.slashTime / this.slashDuration, 1);
+    const currAngle = this.slashStartAngle + f * (this.slashEndAngle - this.slashStartAngle);
+
+    // Helper to check if a specific angle lies within the swept range, handling boundary wraps
+    const isAngleInSweep = (ang: number, start: number, current: number) => {
+      let diffAng = ang - start;
+      while (diffAng < -Math.PI) diffAng += Math.PI * 2;
+      while (diffAng > Math.PI) diffAng -= Math.PI * 2;
+      const totalSweep = current - start;
+      return diffAng >= 0 && diffAng <= totalSweep;
+    };
+
+    // 1. Check bullets in the swept path
+    if (this.enemyBullets) {
+      this.enemyBullets.getChildren().forEach((bulletObj: any) => {
+        if (this.slashedIds.has(bulletObj)) return;
+
+        const bullet = bulletObj as Phaser.Physics.Arcade.Sprite;
+        const dist = Phaser.Math.Distance.Between(playerX, playerY, bullet.x, bullet.y);
+
+        if (dist <= r) {
+          const phi = Phaser.Math.Angle.Between(playerX, playerY, bullet.x, bullet.y);
+          if (isAngleInSweep(phi, this.slashStartAngle, currAngle)) {
+            this.slashedIds.add(bulletObj);
+
+            // Just Slash Check: Caught exactly by the outermost edge (88px to 102px)
+            if (dist >= 88 && dist <= 102) {
+              this.triggerJustSlashBurst();
+            } else {
+              this.score += 50;
+              this.slashCount++;
+              this.createSparks(bullet.x, bullet.y, 0x00f0ff);
+              bullet.destroy();
+              this.updateHudData();
+            }
+          }
         }
-      }
-    });
+      });
+    }
+
+    // 2. Check enemies in the swept path
+    if (this.enemies) {
+      this.enemies.getChildren().forEach((enemyObj: any) => {
+        if (this.slashedIds.has(enemyObj)) return;
+
+        const enemy = enemyObj as Phaser.Physics.Arcade.Sprite;
+        const dist = Phaser.Math.Distance.Between(playerX, playerY, enemy.x, enemy.y);
+
+        if (dist <= r) {
+          const phi = Phaser.Math.Angle.Between(playerX, playerY, enemy.x, enemy.y);
+          if (isAngleInSweep(phi, this.slashStartAngle, currAngle)) {
+            this.slashedIds.add(enemyObj);
+
+            // Just Slash Check: Caught exactly by the outer edge (85px to 105px)
+            if (dist >= 85 && dist <= 105) {
+              this.triggerJustSlashBurst();
+            } else {
+              this.slashCount++;
+              this.damageEnemy(enemy, 25); // Apply normal slash damage
+              this.updateHudData();
+            }
+          }
+        }
+      });
+    }
   }
 
   // --- Just-Slash BURST Mode ---
@@ -386,6 +426,13 @@ export default class GameScene extends Phaser.Scene {
     if (this.isBurstMode) return;
     this.isBurstMode = true;
     this.burstSlashCount = 0;
+
+    // End normal sweeping slash immediately
+    this.isSlashActive = false;
+    if (this.slashVisualRing) {
+      this.slashVisualRing.destroy();
+      this.slashVisualRing = null;
+    }
 
     // Trigger visual flash
     EventBus.emit("flash-screen");
@@ -581,6 +628,9 @@ export default class GameScene extends Phaser.Scene {
     this.activeBoss.setScale(bossScale);
     this.activeBoss.body?.setSize(this.activeBoss.width * 0.75, this.activeBoss.height * 0.75);
 
+    // Add boss to enemies group so it is processed in slash collision checks
+    this.enemies!.add(this.activeBoss);
+
     // HP Scaling
     this.maxBossHp = 1000 + (this.level * 400);
     this.bossHp = this.maxBossHp;
@@ -623,6 +673,9 @@ export default class GameScene extends Phaser.Scene {
     const bossScale = 175 / this.activeBoss.width;
     this.activeBoss.setScale(bossScale);
     this.activeBoss.body?.setSize(this.activeBoss.width * 0.8, this.activeBoss.height * 0.8);
+
+    // Add boss to enemies group so it is processed in slash collision checks
+    this.enemies!.add(this.activeBoss);
 
     // HP Scaling
     this.maxBossHp = 2500 + (this.level * 800);
@@ -926,6 +979,7 @@ export default class GameScene extends Phaser.Scene {
       lifespan: 400,
       maxParticles: 15,
       tint: color,
+      gravityY: 150, // Added gravity effect for sparks
     });
     particles.setDepth(6);
   }

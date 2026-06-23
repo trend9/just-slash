@@ -55,10 +55,11 @@ export default class BootScene extends Phaser.Scene {
 
   create() {
     // Process loaded sprite textures to make their solid backgrounds transparent
-    this.makeBackgroundTransparent("player", 35);
-    this.makeBackgroundTransparent("alien_easy", 35);
-    this.makeBackgroundTransparent("alien_medium", 35);
-    this.makeBackgroundTransparent("boss", 35);
+    // Commented out so that the user can drop in pre-transparent PNGs directly.
+    // this.makeBackgroundTransparent("player", 35);
+    // this.makeBackgroundTransparent("alien_easy", 35);
+    // this.makeBackgroundTransparent("alien_medium", 35);
+    // this.makeBackgroundTransparent("boss", 35);
 
     // Dynamically generate a simple glow particle texture for slashes
     // This avoids having to load a separate particle PNG
@@ -70,7 +71,8 @@ export default class BootScene extends Phaser.Scene {
       if (ctx) {
         const gradient = ctx.createRadialGradient(radius, radius, 0, radius, radius, radius);
         gradient.addColorStop(0, color);
-        gradient.addColorStop(1, "rgba(0,0,0,0)");
+        gradient.addColorStop(0.3, color);
+        gradient.addColorStop(1, "rgba(255, 255, 255, 0)"); // Fade to white transparent to prevent WebGL black outlines
         ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.arc(radius, radius, radius, 0, Math.PI * 2);
@@ -82,7 +84,7 @@ export default class BootScene extends Phaser.Scene {
     createCircleTexture("spark", 8, "rgba(255, 255, 255, 1)", 1);
     createCircleTexture("slash_particle_cyan", 16, "rgba(0, 240, 255, 0.8)", 0.8);
     createCircleTexture("slash_particle_magenta", 16, "rgba(255, 0, 127, 0.8)", 0.8);
-    createCircleTexture("player_laser", 6, "rgba(0, 240, 255, 1)", 1);
+    createCircleTexture("player_laser", 12, "rgba(255, 255, 255, 1)", 1); // Large glowing bullet sphere, white base for custom tinting
 
     // Initialize sound context
     soundSynth.resume();
