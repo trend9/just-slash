@@ -31,6 +31,24 @@ export default function GameContainer({
   const containerRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<any>(null);
 
+  // Store callbacks in refs to avoid triggering useEffect re-runs
+  const callbacksRef = useRef({
+    onGameOver,
+    onGameClear,
+    onUpdateHud,
+    onFlashScreen,
+  });
+
+  // Keep callback refs updated on each render
+  useEffect(() => {
+    callbacksRef.current = {
+      onGameOver,
+      onGameClear,
+      onUpdateHud,
+      onFlashScreen,
+    };
+  });
+
   useEffect(() => {
     let active = true;
 
@@ -67,19 +85,19 @@ export default function GameContainer({
 
       // Connect EventBus listeners
       EventBus.on("game-over", (data: any) => {
-        if (active) onGameOver(data.score, data.slashCount, data.time);
+        if (active) callbacksRef.current.onGameOver(data.score, data.slashCount, data.time);
       });
 
       EventBus.on("game-clear", (data: any) => {
-        if (active) onGameClear(data.score, data.slashCount, data.time);
+        if (active) callbacksRef.current.onGameClear(data.score, data.slashCount, data.time);
       });
 
       EventBus.on("hud-update", (data: any) => {
-        if (active) onUpdateHud(data);
+        if (active) callbacksRef.current.onUpdateHud(data);
       });
 
       EventBus.on("flash-screen", () => {
-        if (active) onFlashScreen();
+        if (active) callbacksRef.current.onFlashScreen();
       });
     }
 
@@ -97,7 +115,7 @@ export default function GameContainer({
         gameRef.current = null;
       }
     };
-  }, [level, onGameOver, onGameClear, onUpdateHud, onFlashScreen]);
+  }, [level]); // Only trigger on level changes
 
   return (
     <div

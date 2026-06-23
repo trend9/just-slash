@@ -54,6 +54,12 @@ export default class BootScene extends Phaser.Scene {
   }
 
   create() {
+    // Process loaded sprite textures to make their solid backgrounds transparent
+    this.makeBackgroundTransparent("player", 35);
+    this.makeBackgroundTransparent("alien_easy", 35);
+    this.makeBackgroundTransparent("alien_medium", 35);
+    this.makeBackgroundTransparent("boss", 35);
+
     // Dynamically generate a simple glow particle texture for slashes
     // This avoids having to load a separate particle PNG
     const createCircleTexture = (name: string, radius: number, color: string, alpha: number) => {
@@ -83,5 +89,44 @@ export default class BootScene extends Phaser.Scene {
 
     // Start the game scene
     this.scene.start("GameScene", { level: this.targetLevel });
+  }
+
+  private makeBackgroundTransparent(textureKey: string, threshold = 35) {
+    const img = this.textures.get(textureKey).getSourceImage() as HTMLImageElement;
+    if (!img || !img.width || !img.height) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(img, 0, 0);
+    try {
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imgData.data;
+      
+      const bgR = data[0];
+      const bgG = data[1];
+      const bgB = data[2];
+      const bgA = data[3];
+
+      // If it's already transparent, we don't need to do anything
+      if (bgA < 10) return;
+
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i+1];
+        const b = data[i+2];
+        
+        const dist = Math.sqrt((r - bgR) ** 2 + (g - bgG) ** 2 + (b - bgB) ** 2);
+        if (dist < threshold) {
+          data[i+3] = 0; // set alpha to 0
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+      this.textures.remove(textureKey);
+      this.textures.addCanvas(textureKey, canvas);
+    } catch (e) {
+      console.warn("Failed to process background transparency for texture: " + textureKey, e);
+    }
   }
 }

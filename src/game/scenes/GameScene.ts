@@ -109,8 +109,13 @@ export default class GameScene extends Phaser.Scene {
     this.player = this.physics.add.sprite(width / 2, height - 100, "player");
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(5);
-    // Shrink hitbox slightly for fairer gameplay
-    this.player.body?.setSize(32, 32);
+    
+    // Scale player sprite display size to 48px width
+    const playerScale = 48 / this.player.width;
+    this.player.setScale(playerScale);
+    
+    // Shrink hitbox relatively for fairer gameplay
+    this.player.body?.setSize(this.player.width * 0.6, this.player.height * 0.6);
 
     // Setup input
     if (this.input.keyboard) {
@@ -489,10 +494,16 @@ export default class GameScene extends Phaser.Scene {
       const xPos = Phaser.Math.Between(40, width - 40);
       const yPos = -50 - (i * 30);
       
-      const enemy = this.enemies!.create(xPos, yPos, type);
+      const enemy = this.enemies!.create(xPos, yPos, type) as any;
       enemy.setDepth(3);
       enemy.isBoss = false;
       enemy.enemyType = type;
+
+      // Scale enemy to fit exactly 40px (easy) or 52px (medium) width
+      const targetSize = type === "alien_easy" ? 40 : 52;
+      const enemyScale = targetSize / enemy.width;
+      enemy.setScale(enemyScale);
+      enemy.body?.setSize(enemy.width * 0.7, enemy.height * 0.7);
 
       // Stats based on level
       if (type === "alien_easy") {
@@ -564,7 +575,11 @@ export default class GameScene extends Phaser.Scene {
     this.activeBoss.setDepth(4);
     this.activeBoss.setCollideWorldBounds(true);
     this.activeBoss.setBounce(1, 0);
-    this.activeBoss.setScale(0.8); // Mid-boss is medium sized
+    
+    // Scale boss to fit exactly 110px width
+    const bossScale = 110 / this.activeBoss.width;
+    this.activeBoss.setScale(bossScale);
+    this.activeBoss.body?.setSize(this.activeBoss.width * 0.75, this.activeBoss.height * 0.75);
 
     // HP Scaling
     this.maxBossHp = 1000 + (this.level * 400);
@@ -603,7 +618,11 @@ export default class GameScene extends Phaser.Scene {
     this.activeBoss.setDepth(4);
     this.activeBoss.setCollideWorldBounds(true);
     this.activeBoss.setBounce(1, 0);
-    this.activeBoss.setScale(1.2); // Final boss is huge!
+    
+    // Scale boss to fit exactly 175px width
+    const bossScale = 175 / this.activeBoss.width;
+    this.activeBoss.setScale(bossScale);
+    this.activeBoss.body?.setSize(this.activeBoss.width * 0.8, this.activeBoss.height * 0.8);
 
     // HP Scaling
     this.maxBossHp = 2500 + (this.level * 800);
