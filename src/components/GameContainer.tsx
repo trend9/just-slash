@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { EventBus } from "../game/EventBus";
+import { EventBus } from "@/game/EventBus";
 
 interface GameContainerProps {
   level: number;
@@ -37,8 +37,8 @@ export default function GameContainer({
     async function initPhaser() {
       // Phaser uses window/document, dynamically import it
       const Phaser = await import("phaser");
-      const { default: BootScene } = await import("../game/scenes/BootScene");
-      const { default: GameScene } = await import("../game/scenes/GameScene");
+      const { default: BootScene } = await import("@/game/scenes/BootScene");
+      const { default: GameScene } = await import("@/game/scenes/GameScene");
 
       if (!active || !containerRef.current) return;
 
