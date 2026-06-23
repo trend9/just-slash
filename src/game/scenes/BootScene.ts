@@ -86,6 +86,26 @@ export default class BootScene extends Phaser.Scene {
     createCircleTexture("slash_particle_magenta", 16, "rgba(255, 0, 127, 0.8)", 0.8);
     createCircleTexture("player_laser", 12, "rgba(255, 255, 255, 1)", 1); // Large glowing bullet sphere, white base for custom tinting
 
+    // Generate glowing green cross texture for HP recovery items
+    const canvas = document.createElement("canvas");
+    canvas.width = 32;
+    canvas.height = 32;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      // Glow background circle
+      ctx.fillStyle = "rgba(0, 240, 100, 0.25)";
+      ctx.beginPath();
+      ctx.arc(16, 16, 16, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Green neon cross
+      ctx.fillStyle = "#00f064";
+      ctx.fillRect(13, 6, 6, 20); // vertical block
+      ctx.fillRect(6, 13, 20, 6); // horizontal block
+      
+      this.textures.addCanvas("heal_item", canvas);
+    }
+
     // Initialize sound context
     soundSynth.resume();
 

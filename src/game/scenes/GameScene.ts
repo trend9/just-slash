@@ -38,6 +38,7 @@ export default class GameScene extends Phaser.Scene {
   private bg1: Phaser.GameObjects.TileSprite | null = null;
 
   // Slashing logic
+  private slashRadius: number = 80; // Shortened sword length (was 100)
   private slashCooldown: number = 0; // ms
   private maxSlashCooldown: number = 400; // 0.4 seconds
   private isSlashActive: boolean = false;
@@ -47,6 +48,10 @@ export default class GameScene extends Phaser.Scene {
   private slashedIds: Set<any> = new Set();
   private slashStartAngle: number = -Math.PI - 0.25; // slightly behind left
   private slashEndAngle: number = 0.25; // slightly behind right
+  
+  // HP Recovery Item state
+  private hasDroppedRecoveryItem: boolean = false;
+  private recoveryItems: Phaser.Physics.Arcade.Group | null = null;
   
   // Burst mode
   private isBurstMode: boolean = false;
@@ -196,9 +201,14 @@ export default class GameScene extends Phaser.Scene {
       loop: true,
     });
 
+    // HP Recovery Item setup
+    this.recoveryItems = this.physics.add.group();
+    this.hasDroppedRecoveryItem = false;
+
     // Overlap checks
     this.physics.add.overlap(this.player, this.enemyBullets, this.handleBulletPlayerCollision, undefined, this);
     this.physics.add.overlap(this.player, this.enemies, this.handleEnemyPlayerCollision, undefined, this);
+    this.physics.add.overlap(this.player, this.recoveryItems, this.handleHealOverlap, undefined, this);
 
     // Initial audio setup and BGM start
     soundSynth.startBGM(this.level);
@@ -281,6 +291,53 @@ export default class GameScene extends Phaser.Scene {
         }
       });
     }
+
+    // --- Manual Left/Right Clamping and Bounce for Player, Boss, and Enemies ---
+    if (this.player && this.player.active) {
+      this.player.x = Phaser.Math.Clamp(this.player.x, 24, 480 - 24);
+    }
+
+    if (this.activeBoss && this.activeBoss.active) {
+      const halfWidth = this.activeBoss.displayWidth / 2;
+      if (this.activeBoss.x - halfWidth < 0) {
+        this.activeBoss.x = halfWidth;
+        if (this.activeBoss.body) {
+          this.activeBoss.setVelocityX(Math.abs(this.activeBoss.body.velocity.x)); // reverse direction
+        }
+      } else if (this.activeBoss.x + halfWidth > 480) {
+        this.activeBoss.x = 480 - halfWidth;
+        if (this.activeBoss.body) {
+          this.activeBoss.setVelocityX(-Math.abs(this.activeBoss.body.velocity.x)); // reverse direction
+        }
+      }
+    }
+
+    if (this.enemies) {
+      this.enemies.getChildren().forEach((e: any) => {
+        if (!e.active || e === this.activeBoss) return;
+        const halfWidth = e.displayWidth / 2;
+        if (e.x - halfWidth < 0) {
+          e.x = halfWidth;
+          if (e.body && e.body.velocity.x !== 0) {
+            e.setVelocityX(Math.abs(e.body.velocity.x));
+          }
+        } else if (e.x + halfWidth > 480) {
+          e.x = 480 - halfWidth;
+          if (e.body && e.body.velocity.x !== 0) {
+            e.setVelocityX(-Math.abs(e.body.velocity.x));
+          }
+        }
+      });
+    }
+
+    // Clean up recovery items that slip past the bottom
+    if (this.recoveryItems) {
+      this.recoveryItems.getChildren().forEach((item: any) => {
+        if (item.y > 850) {
+          item.destroy();
+        }
+      });
+    }
   }
 
   // --- Attack / Slash Logic ---
@@ -310,7 +367,7 @@ export default class GameScene extends Phaser.Scene {
 
     const x = this.player.x;
     const y = this.player.y;
-    const r = 100; // Sword radius
+    const r = this.slashRadius; // Use the shortened sword radius (80px)
 
     const f = Math.min(this.slashTime / this.slashDuration, 1);
     const currAngle = this.slashStartAngle + f * (this.slashEndAngle - this.slashStartAngle);
@@ -351,7 +408,7 @@ export default class GameScene extends Phaser.Scene {
     if (!this.player) return;
     const playerX = this.player.x;
     const playerY = this.player.y;
-    const r = 100;
+    const r = this.slashRadius; // Shortened sword radius
 
     const f = Math.min(this.slashTime / this.slashDuration, 1);
     const currAngle = this.slashStartAngle + f * (this.slashEndAngle - this.slashStartAngle);
@@ -378,8 +435,8 @@ export default class GameScene extends Phaser.Scene {
           if (isAngleInSweep(phi, this.slashStartAngle, currAngle)) {
             this.slashedIds.add(bulletObj);
 
-            // Just Slash Check: Caught exactly by the outermost edge (88px to 102px)
-            if (dist >= 88 && dist <= 102) {
+            // Just Slash Check: Caught exactly by the outermost edge relative to slashRadius (70px to 82px)
+            if (dist >= r - 10 && dist <= r + 2) {
               this.triggerJustSlashBurst();
             } else {
               this.score += 50;
@@ -406,8 +463,8 @@ export default class GameScene extends Phaser.Scene {
           if (isAngleInSweep(phi, this.slashStartAngle, currAngle)) {
             this.slashedIds.add(enemyObj);
 
-            // Just Slash Check: Caught exactly by the outer edge (85px to 105px)
-            if (dist >= 85 && dist <= 105) {
+            // Just Slash Check: Caught exactly by the outer edge relative to slashRadius (68px to 85px)
+            if (dist >= r - 12 && dist <= r + 5) {
               this.triggerJustSlashBurst();
             } else {
               this.slashCount++;
@@ -850,6 +907,12 @@ export default class GameScene extends Phaser.Scene {
       if (enemy.isBoss) {
         this.handleBossDefeat();
       } else {
+        // Roll for HP recovery item drop (once per stage, 30% chance)
+        if (!this.hasDroppedRecoveryItem && Phaser.Math.Between(1, 10) <= 3) {
+          this.hasDroppedRecoveryItem = true;
+          this.spawnRecoveryItem(enemy.x, enemy.y);
+        }
+
         this.score += enemy.enemyType === "alien_medium" ? 300 : 100;
         enemy.destroy();
       }
@@ -982,5 +1045,38 @@ export default class GameScene extends Phaser.Scene {
       gravityY: 150, // Added gravity effect for sparks
     });
     particles.setDepth(6);
+  }
+
+  // Spawn HP recovery item that drifts down slowly
+  private spawnRecoveryItem(x: number, y: number) {
+    if (!this.recoveryItems) return;
+
+    const item = this.recoveryItems.create(x, y, "heal_item") as any;
+    item.setDepth(3);
+    item.setScale(0.85);
+
+    // Slow downward drift
+    item.setVelocityY(60);
+    // Slight side sway
+    item.setVelocityX(Phaser.Math.Between(-15, 15));
+    item.setCollideWorldBounds(true);
+    item.setBounce(1, 0);
+  }
+
+  // Handle player collecting HP recovery item
+  private handleHealOverlap(player: any, item: any) {
+    item.destroy();
+
+    // Recover 1/10 of max HP (10 points)
+    const healAmount = 10;
+    this.playerHp = Math.min(this.playerHp + healAmount, this.maxPlayerHp);
+
+    // Play heal chime SFX
+    soundSynth.playHeal();
+
+    // Neon green particles for healing visual effect
+    this.createSparks(player.x, player.y, 0x00f064);
+
+    this.updateHudData();
   }
 }

@@ -188,6 +188,38 @@ export class SoundSynth {
     }
   }
 
+  public playHeal() {
+    this.resume();
+    if (!this.ctx || !this.masterVolume || this.isMuted) return;
+
+    // Classic retro ascending chime sweep
+    const playTick = (delay: number, freq: number) => {
+      if (!this.ctx || !this.masterVolume) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      
+      osc.connect(gain);
+      gain.connect(this.masterVolume);
+      
+      osc.type = "sine";
+      const time = this.ctx.currentTime + delay;
+      
+      osc.frequency.setValueAtTime(freq, time);
+      gain.gain.setValueAtTime(0, time);
+      gain.gain.linearRampToValueAtTime(0.2, time + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.12);
+      
+      osc.start(time);
+      osc.stop(time + 0.15);
+    };
+
+    // Ascending arpeggio chime (C major style chord)
+    playTick(0, 523.25); // C5
+    playTick(0.06, 659.25); // E5
+    playTick(0.12, 783.99); // G5
+    playTick(0.18, 1046.50); // C6
+  }
+
   private createNoiseNode(): AudioBufferSourceNode | null {
     if (!this.ctx) return null;
     const bufferSize = this.ctx.sampleRate * 0.4;
