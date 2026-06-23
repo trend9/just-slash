@@ -38,7 +38,7 @@ export default class GameScene extends Phaser.Scene {
   private bg1: Phaser.GameObjects.TileSprite | null = null;
 
   // Slashing logic
-  private slashRadius: number = 80; // Shortened sword length (was 100)
+  private slashRadius: number = 90; // Lengthened sword slightly (was 80) for better balance
   private slashCooldown: number = 0; // ms
   private maxSlashCooldown: number = 400; // 0.4 seconds
   private isSlashActive: boolean = false;
