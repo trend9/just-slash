@@ -1,0 +1,210 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Outfit:wght@300;400;600;800&display=swap');
+
+:root {
+  --bg-color: #0b0512;
+  --panel-bg: rgba(22, 11, 38, 0.7);
+  --panel-border: rgba(162, 0, 255, 0.35);
+  --neon-purple: #a200ff;
+  --neon-magenta: #ff007f;
+  --neon-cyan: #00f0ff;
+  --text-primary: #f8f7f9;
+  --text-secondary: #c2b5d4;
+  
+  --font-game: 'Orbitron', sans-serif;
+  --font-ui: 'Outfit', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Background animated cyber grid */
+body::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    linear-gradient(rgba(162, 0, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(162, 0, 255, 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: center;
+  animation: grid-scroll 20s linear infinite;
+  z-index: -1;
+}
+
+@keyframes grid-scroll {
+  from { background-position: 0 0; }
+  to { background-position: 0 800px; }
+}
+
+/* Arcade Cabinet container */
+.arcade-container {
+  position: relative;
+  width: 480px;
+  height: 800px;
+  background-color: #050208;
+  border-radius: 20px;
+  box-shadow: 
+    0 0 20px rgba(0, 0, 0, 0.8),
+    0 0 40px rgba(162, 0, 255, 0.3),
+    0 0 80px rgba(0, 240, 255, 0.1);
+  border: 4px solid #1a0e2d;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 500px) {
+  .arcade-container {
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+    border: none;
+  }
+}
+
+/* Common Glass Panels */
+.glass-panel {
+  background: var(--panel-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  box-shadow: 
+    0 8px 32px 0 rgba(0, 0, 0, 0.37),
+    inset 0 0 12px rgba(162, 0, 255, 0.1);
+}
+
+.glowing-text-cyan {
+  color: var(--neon-cyan);
+  text-shadow: 0 0 5px rgba(0, 240, 255, 0.5), 0 0 15px rgba(0, 240, 255, 0.8);
+}
+
+.glowing-text-magenta {
+  color: var(--neon-magenta);
+  text-shadow: 0 0 5px rgba(255, 0, 127, 0.5), 0 0 15px rgba(255, 0, 127, 0.8);
+}
+
+.glowing-text-purple {
+  color: var(--neon-purple);
+  text-shadow: 0 0 5px rgba(162, 0, 255, 0.5), 0 0 15px rgba(162, 0, 255, 0.8);
+}
+
+/* Custom styled buttons */
+.btn-cyber {
+  position: relative;
+  background: linear-gradient(135deg, var(--neon-purple), var(--neon-magenta));
+  color: white;
+  border: none;
+  font-family: var(--font-game);
+  font-weight: 700;
+  letter-spacing: 2px;
+  padding: 14px 28px;
+  border-radius: 8px;
+  cursor: pointer;
+  overflow: hidden;
+  box-shadow: 0 0 15px rgba(255, 0, 127, 0.4);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  text-transform: uppercase;
+}
+
+.btn-cyber:hover {
+  transform: scale(1.05);
+  box-shadow: 
+    0 0 25px rgba(255, 0, 127, 0.8),
+    0 0 10px rgba(0, 240, 255, 0.5);
+}
+
+.btn-cyber::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -50%;
+  width: 200%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transform: skewX(-20deg);
+  transition: 0.75s;
+  opacity: 0;
+}
+
+.btn-cyber:hover::after {
+  left: 120%;
+  opacity: 1;
+}
+
+/* Secondary Button */
+.btn-cyber-sec {
+  background: rgba(22, 11, 38, 0.8);
+  border: 1px solid var(--neon-cyan);
+  color: var(--neon-cyan);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+}
+
+.btn-cyber-sec:hover {
+  background: var(--neon-cyan);
+  color: #0b0512;
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.6);
+  transform: scale(1.05);
+}
+
+/* Scanline Overlay for retro CRT look */
+.scanlines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%, 
+    rgba(0, 0, 0, 0.25) 50%
+  ), linear-gradient(
+    90deg,
+    rgba(255, 0, 0, 0.06),
+    rgba(0, 255, 0, 0.02),
+    rgba(0, 0, 255, 0.06)
+  );
+  background-size: 100% 4px, 6px 100%;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Keyframes for screen flash */
+@keyframes flash {
+  0% { background-color: rgba(255, 255, 255, 0.8); }
+  100% { background-color: rgba(255, 255, 255, 0); }
+}
+
+.flash-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9;
+  background-color: transparent;
+}
+
+.flash-overlay.active {
+  animation: flash 0.3s ease-out;
+}
