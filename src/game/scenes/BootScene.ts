@@ -61,50 +61,88 @@ export default class BootScene extends Phaser.Scene {
     // this.makeBackgroundTransparent("alien_medium", 35);
     // this.makeBackgroundTransparent("boss", 35);
 
-    // Dynamically generate a simple glow particle texture for slashes
-    // This avoids having to load a separate particle PNG
-    const createCircleTexture = (name: string, radius: number, color: string, alpha: number) => {
+    // Dynamically generate game textures to avoid external asset dependency issues
+    const drawVBullet = () => {
       const canvas = document.createElement("canvas");
-      canvas.width = radius * 2;
-      canvas.height = radius * 2;
+      canvas.width = 32;
+      canvas.height = 24;
       const ctx = canvas.getContext("2d");
       if (ctx) {
-        const gradient = ctx.createRadialGradient(radius, radius, 0, radius, radius, radius);
-        gradient.addColorStop(0, color);
-        gradient.addColorStop(0.3, color);
-        gradient.addColorStop(1, "rgba(255, 255, 255, 0)"); // Fade to white transparent to prevent WebGL black outlines
-        ctx.fillStyle = gradient;
+        // Add a soft glow behind/around it
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+        ctx.lineWidth = 7;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
         ctx.beginPath();
-        ctx.arc(radius, radius, radius, 0, Math.PI * 2);
-        ctx.fill();
-        this.textures.addCanvas(name, canvas);
+        ctx.moveTo(6, 3);
+        ctx.lineTo(26, 12);
+        ctx.lineTo(6, 21);
+        ctx.stroke();
+
+        // White core
+        ctx.strokeStyle = "rgba(255, 255, 255, 1)";
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.moveTo(6, 3);
+        ctx.lineTo(26, 12);
+        ctx.lineTo(6, 21);
+        ctx.stroke();
+
+        this.textures.addCanvas("v_bullet", canvas);
       }
     };
+    drawVBullet();
 
-    createCircleTexture("spark", 8, "rgba(255, 255, 255, 1)", 1);
-    createCircleTexture("slash_particle_cyan", 16, "rgba(0, 240, 255, 0.8)", 0.8);
-    createCircleTexture("slash_particle_magenta", 16, "rgba(255, 0, 127, 0.8)", 0.8);
-    createCircleTexture("player_laser", 12, "rgba(255, 255, 255, 1)", 1); // Large glowing bullet sphere, white base for custom tinting
+    const drawSpark = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 16;
+      canvas.height = 16;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        const gradient = ctx.createRadialGradient(8, 8, 0, 8, 8, 8);
+        gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
+        gradient.addColorStop(0.3, "rgba(255, 255, 255, 0.85)");
+        gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(8, 8, 8, 0, Math.PI * 2);
+        ctx.fill();
+        this.textures.addCanvas("spark", canvas);
+      }
+    };
+    drawSpark();
 
-    // Generate glowing green cross texture for HP recovery items
-    const canvas = document.createElement("canvas");
-    canvas.width = 32;
-    canvas.height = 32;
-    const ctx = canvas.getContext("2d");
-    if (ctx) {
-      // Glow background circle
-      ctx.fillStyle = "rgba(0, 240, 100, 0.25)";
-      ctx.beginPath();
-      ctx.arc(16, 16, 16, 0, Math.PI * 2);
-      ctx.fill();
-      
-      // Green neon cross
-      ctx.fillStyle = "#00f064";
-      ctx.fillRect(13, 6, 6, 20); // vertical block
-      ctx.fillRect(6, 13, 20, 6); // horizontal block
-      
-      this.textures.addCanvas("heal_item", canvas);
-    }
+    const drawHealItem = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 24;
+      canvas.height = 24;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        // Outer glowing circle
+        const gradient = ctx.createRadialGradient(12, 12, 4, 12, 12, 12);
+        gradient.addColorStop(0, "rgba(0, 240, 100, 1)");
+        gradient.addColorStop(0.6, "rgba(0, 240, 100, 0.45)");
+        gradient.addColorStop(1, "rgba(0, 240, 100, 0)");
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(12, 12, 12, 0, Math.PI * 2);
+        ctx.fill();
+
+        // White cross
+        ctx.strokeStyle = "rgba(255, 255, 255, 1)";
+        ctx.lineWidth = 3;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(12, 6);
+        ctx.lineTo(12, 18);
+        ctx.moveTo(6, 12);
+        ctx.lineTo(18, 12);
+        ctx.stroke();
+
+        this.textures.addCanvas("heal_item", canvas);
+      }
+    };
+    drawHealItem();
 
     // Initialize sound context
     soundSynth.resume();

@@ -279,6 +279,9 @@ export default class GameScene extends Phaser.Scene {
         // If bullet moves beyond top or bottom screen limits, destroy it
         if (b.y > 850 || b.y < -50) {
           b.destroy();
+        } else if (b.active && b.body) {
+          // Align chevron/V direction to velocity vector
+          b.rotation = Math.atan2(b.body.velocity.y, b.body.velocity.x);
         }
       });
     }
@@ -437,7 +440,7 @@ export default class GameScene extends Phaser.Scene {
 
             // Just Slash Check: Caught exactly by the outermost edge relative to slashRadius (70px to 82px)
             if (dist >= r - 10 && dist <= r + 2) {
-              this.triggerJustSlashBurst();
+              this.triggerJustSlashBurst(bullet.x, bullet.y);
             } else {
               this.score += 50;
               this.slashCount++;
@@ -465,7 +468,7 @@ export default class GameScene extends Phaser.Scene {
 
             // Just Slash Check: Caught exactly by the outer edge relative to slashRadius (68px to 85px)
             if (dist >= r - 12 && dist <= r + 5) {
-              this.triggerJustSlashBurst();
+              this.triggerJustSlashBurst(enemy.x, enemy.y);
             } else {
               this.slashCount++;
               this.damageEnemy(enemy, 25); // Apply normal slash damage
@@ -479,7 +482,7 @@ export default class GameScene extends Phaser.Scene {
 
   // --- Just-Slash BURST Mode ---
 
-  private triggerJustSlashBurst() {
+  private triggerJustSlashBurst(x?: number, y?: number) {
     if (this.isBurstMode) return;
     this.isBurstMode = true;
     this.burstSlashCount = 0;
@@ -496,6 +499,11 @@ export default class GameScene extends Phaser.Scene {
 
     // Play intense chime audio
     soundSynth.playJustSlash();
+
+    // Spawn high-fidelity sharp neon spikes visual
+    if (x !== undefined && y !== undefined) {
+      this.createSharpJustSlashVisual(x, y, 0x00f0ff);
+    }
 
     // 1. Brief game freeze frame (slow down/pause physics) to feel hits heavy
     this.physics.world.pause();
@@ -648,7 +656,7 @@ export default class GameScene extends Phaser.Scene {
 
     if (enemy.enemyType === "alien_easy") {
       // Straight shot at player
-      const bullet = this.enemyBullets!.create(enemy.x, enemy.y, "player_laser");
+      const bullet = this.enemyBullets!.create(enemy.x, enemy.y, "v_bullet");
       bullet.setTint(0xa200ff); // Purple
       bullet.setDepth(2);
       this.physics.moveTo(bullet, px, py, bSpeed);
@@ -657,7 +665,7 @@ export default class GameScene extends Phaser.Scene {
     } else {
       // 2-Way spread shot
       for (let i = -1; i <= 1; i += 2) {
-        const bullet = this.enemyBullets!.create(enemy.x, enemy.y, "player_laser");
+        const bullet = this.enemyBullets!.create(enemy.x, enemy.y, "v_bullet");
         bullet.setTint(0xff007f); // Magenta
         bullet.setDepth(2);
         
@@ -691,6 +699,8 @@ export default class GameScene extends Phaser.Scene {
     // HP Scaling
     this.maxBossHp = 1000 + (this.level * 400);
     this.bossHp = this.maxBossHp;
+    this.activeBoss.hp = this.maxBossHp;
+    this.activeBoss.maxHp = this.maxBossHp;
 
     // Tween boss onto the screen
     this.tweens.add({
@@ -737,6 +747,8 @@ export default class GameScene extends Phaser.Scene {
     // HP Scaling
     this.maxBossHp = 2500 + (this.level * 800);
     this.bossHp = this.maxBossHp;
+    this.activeBoss.hp = this.maxBossHp;
+    this.activeBoss.maxHp = this.maxBossHp;
 
     // Tween boss onto the screen
     this.tweens.add({
@@ -780,7 +792,7 @@ export default class GameScene extends Phaser.Scene {
           const baseAngle = Phaser.Math.Angle.Between(bx, by, px, py);
 
           for (let i = 0; i < ways; i++) {
-            const bullet = this.enemyBullets!.create(bx, by, "player_laser");
+            const bullet = this.enemyBullets!.create(bx, by, "v_bullet");
             bullet.setTint(0x00f0ff); // Cyan
             bullet.setDepth(2);
             
@@ -801,7 +813,7 @@ export default class GameScene extends Phaser.Scene {
             const count = 18;
             const time = this.time.now / 1000;
             for (let i = 0; i < count; i++) {
-              const bullet = this.enemyBullets!.create(bx, by, "player_laser");
+              const bullet = this.enemyBullets!.create(bx, by, "v_bullet");
               bullet.setTint(0xff007f);
               bullet.setDepth(2);
               
@@ -814,7 +826,7 @@ export default class GameScene extends Phaser.Scene {
             // Full 360 Degree Blast
             const count = 8 + (this.level * 2);
             for (let i = 0; i < count; i++) {
-              const bullet = this.enemyBullets!.create(bx, by, "player_laser");
+              const bullet = this.enemyBullets!.create(bx, by, "v_bullet");
               bullet.setTint(0xa200ff);
               bullet.setDepth(2);
               
@@ -889,7 +901,14 @@ export default class GameScene extends Phaser.Scene {
 
   private damageEnemy(enemy: any, dmg: number) {
     if (!enemy.active) return;
-    enemy.hp -= dmg;
+    
+    if (enemy.isBoss) {
+      this.bossHp -= dmg;
+      if (this.bossHp < 0) this.bossHp = 0;
+      enemy.hp = this.bossHp;
+    } else {
+      enemy.hp -= dmg;
+    }
     
     // Visual flash on hit
     this.tweens.add({
@@ -1045,6 +1064,52 @@ export default class GameScene extends Phaser.Scene {
       gravityY: 150, // Added gravity effect for sparks
     });
     particles.setDepth(6);
+  }
+
+  private createSharpJustSlashVisual(x: number, y: number, color: number = 0x00f0ff) {
+    const spikeCount = 12;
+    const g = this.add.graphics();
+    g.setDepth(7);
+
+    const spikes = Array.from({ length: spikeCount }, () => {
+      const angle = Phaser.Math.Between(0, 360) * (Math.PI / 180);
+      const length = Phaser.Math.Between(80, 160);
+      const width = Phaser.Math.Between(2, 5);
+      return { angle, length, currentLength: 0, width };
+    });
+
+    this.tweens.addCounter({
+      from: 0,
+      to: 1,
+      duration: 300,
+      ease: "Expo.easeOut",
+      onUpdate: (tween) => {
+        const progress = tween.getValue() as number;
+        g.clear();
+
+        spikes.forEach((spike) => {
+          const startDist = progress * (spike.length * 0.4);
+          const endDist = progress * spike.length;
+          const alpha = 1 - progress;
+
+          g.lineStyle(spike.width, color, alpha);
+          g.beginPath();
+          g.moveTo(x + Math.cos(spike.angle) * startDist, y + Math.sin(spike.angle) * startDist);
+          g.lineTo(x + Math.cos(spike.angle) * endDist, y + Math.sin(spike.angle) * endDist);
+          g.stroke();
+
+          // White hot core
+          g.lineStyle(Math.max(1, spike.width - 2), 0xffffff, alpha);
+          g.beginPath();
+          g.moveTo(x + Math.cos(spike.angle) * startDist, y + Math.sin(spike.angle) * startDist);
+          g.lineTo(x + Math.cos(spike.angle) * endDist, y + Math.sin(spike.angle) * endDist);
+          g.stroke();
+        });
+      },
+      onComplete: () => {
+        g.destroy();
+      }
+    });
   }
 
   // Spawn HP recovery item that drifts down slowly
